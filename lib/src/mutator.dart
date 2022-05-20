@@ -16,7 +16,8 @@ FutureOr<String> mutate(
     {int stacks = 3}) async {
   var result = input;
   for (var i = random.nextInt(stacks) + 1; i > 0; --i) {
-    result = await mutators.choose(random).mutatorFn(result, random);
+    final mutator = mutators.choose(random);
+    result = await mutator.mutatorFn(result, random, mutator.customCharSet);
   }
   return result;
 }
@@ -39,15 +40,15 @@ Future<List<String>> mutateMany(List<String> inputs, Random random,
     for (var stackIndex = 0, mutatorIndex = 0;
         stackIndex < chosenStacks[i];
         stackIndex++, mutatorIndex++) {
-      results[i] =
-          await chosenMutators[mutatorIndex].mutatorFn(results[i], random);
+      results[i] = await chosenMutators[mutatorIndex].mutatorFn(
+          results[i], random, chosenMutators[mutatorIndex].customCharSet);
     }
   }
   return results;
 }
 
 /// The function signature of a mutator for mutation-based fuzzing.
-typedef Mutator = FutureOr<String> Function(String, Random);
+typedef Mutator = FutureOr<String> Function(String, Random, List<String>);
 
 /// A Mutator with a weight for probabilistic weighted selection.
 abstract class WeightedMutator {
@@ -56,4 +57,7 @@ abstract class WeightedMutator {
 
   /// The weight for probability of selecting this mutator.
   double get weight;
+
+  /// Specifies valid characters in generated inputs.
+  List<String> get customCharSet;
 }

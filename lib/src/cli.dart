@@ -85,6 +85,12 @@ class Cli {
       help: 'A path to a script, or comma separated path to scripts, that'
           ' perform specialized mutations',
     )
+    ..addMultiOption(
+      'char-set',
+      abbr: 'y',
+      help: 'Specify valid characters for input String generation. '
+          'All characters are valid by default.',
+    )
     ..addOption('count',
         abbr: 'n',
         help: 'How many fuzz cases to run. -1 is no limit',
@@ -242,6 +248,8 @@ class Cli {
   }
 
   Future<List<IsolateMutator>> _getIsolateMutators(ArgResults args) async {
+    final customCharSet = args['char-set'] as List<String>;
+
     final isolateMutators =
         (args['mutator_script'] as List<String>).map((origScript) {
       String script;
@@ -256,7 +264,7 @@ class Cli {
         script = origScript;
       }
 
-      return IsolateMutator(script, weight);
+      return IsolateMutator(script, weight, customCharSet);
     }).toList();
     await Future.wait(isolateMutators.map((isolate) => isolate.start()));
     return isolateMutators;
@@ -264,10 +272,16 @@ class Cli {
 
   WeightedOptions<WeightedMutator> _getMutators(ArgResults args,
       List<IsolateMutator> isolateMutators, SeedLibrary seedLibrary) {
+    final customCharSet = args['char-set'] as List<String>;
+
     final mutators = [
-      if (args['default_mutators']) ...defaultMutators,
-      if (args['default_mutators']) getCrossoverMutator(seedLibrary),
-      if (args['default_mutators']) getSpliceMutator(seedLibrary),
+      if (args['default_mutators']) DefaultMutator(addChar, customCharSet),
+      if (args['default_mutators']) DefaultMutator(flipChar, customCharSet),
+      if (args['default_mutators']) DefaultMutator(removeChar, customCharSet),
+      if (args['default_mutators'])
+        getCrossoverMutator(seedLibrary, customCharSet),
+      if (args['default_mutators'])
+        getSpliceMutator(seedLibrary, customCharSet),
       ...isolateMutators
     ];
     if (mutators.isEmpty) {

@@ -22,11 +22,14 @@ class IsolateMutator implements WeightedMutator {
   @override
   Mutator mutatorFn;
 
+  @override
+  final List<String> customCharSet;
+
   int _ids = 0;
   final _completers = <int, Completer<String>>{};
 
   /// Construct an [IsolateMutator] with the given script and weight.
-  IsolateMutator(this._scriptPath, this.weight);
+  IsolateMutator(this._scriptPath, this.weight, this.customCharSet);
 
   /// Dispose of this isolate.
   void dispose() {
@@ -75,7 +78,7 @@ class IsolateMutator implements WeightedMutator {
         onError: _onErrorPort.sendPort,
         onExit: _onExitPort.sendPort);
 
-    mutatorFn = (String input, Random _) async {
+    mutatorFn = (String input, Random _, List<String> customCharSet) async {
       final id = _ids++;
       _sendPort.send([id, input]);
       _completers[id] = Completer<String>();
