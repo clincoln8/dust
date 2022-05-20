@@ -226,10 +226,11 @@ class Cli {
           print('\nSeed not added to corpus: ${seed.userString}');
         }
       });
-      driver.onSuccess.listen((_) => stdout.write('.'));
-      driver.onDuplicateFail.listen((_) => stdout.write('F'));
+      driver.onSuccess.listen((_) => stdout.write(''));
+      driver.onDuplicateFail.listen((_) => stdout.write(''));
       driver.onUniqueFail.listen((failure) {
-        print('\nFAILURE: ${failure.input}\n${failure.result.errorOutput}');
+        print(
+            '\nUNIQUE FAILURE: ${failure.input}\n${failure.result.errorOutput}');
         failurePersistence?.recordFailure(failure);
         exitCode = 1;
       });
