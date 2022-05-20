@@ -90,26 +90,26 @@ class VmController {
 
   Future<VmService> _connect() async {
     final _serviceClient = await _exponentialBackoff(
-        () => vmServiceConnect(_host, _port, log: _StdoutLog()),
-        (client) => client != null);
+	() => vmServiceConnect(_host, _port, log: _StdoutLog()),
+	(client) => client != null);
     unawaited(_serviceClient.streamListen(EventStreams.kDebug));
     _serviceClient.onDebugEvent.listen((event) {
-      if (event.kind == 'PauseExit') {
-        if (event.isolate.name == 'fuzz_target') {
-          _timeElapsed = DateTime.now().difference(_startTime);
-        } else {
-          _serviceClient.resume(event.isolate.id);
-        }
-      }
-    });
+	if (event.kind == 'PauseExit') {
+	if (event.isolate.name == 'fuzz_target') {
+	_timeElapsed = DateTime.now().difference(_startTime);
+	} else {
+	_serviceClient.resume(event.isolate.id);
+	}
+	}
+	});
 
     // Wait until the main isolate starts, to force an exception now if
     // observatory can't start.
     await _exponentialBackoff(
-        () async => (await _serviceClient.getVM())
-            .isolates
-            .singleWhere((isolate) => isolate.name == 'main'),
-        (isolate) => isolate != null);
+	() async => (await _serviceClient.getVM())
+	.isolates
+	.singleWhere((isolate) => isolate.name == 'main'),
+	(isolate) => isolate != null);
 
     return _serviceClient;
   }
@@ -117,49 +117,54 @@ class VmController {
   Future<T> _exponentialBackoff<T>(
       Future<T> Function() action, bool Function(T) accept,
       {Duration limit = const Duration(seconds: 5)}) async {
-    var wait = const Duration(milliseconds: 1);
-    final start = DateTime.now();
+							     var wait = const Duration(milliseconds: 1);
+							     final start = DateTime.now();
 
-    dynamic reason;
+							     dynamic reason;
 
-    while (DateTime.now().difference(start) < limit) {
-      if (_exitCode != null) {
-        throw Exception('VM at $_port exited with code $_exitCode:\n'
-            '$_outputBuffer\n'
-            '$_stdErrBuffer');
-      }
+							     while (DateTime.now().difference(start) < limit) {
+							       if (_exitCode != null) {
+								 throw Exception('VM at $_port exited with code $_exitCode:\n'
+								     '$_outputBuffer\n'
+								     '$_stdErrBuffer');
+							       }
 
-      try {
-        final result = await action();
-        if (accept(result)) {
-          return result;
-        }
-        reason = 'not accepted';
-      } catch (e, st) {
-        reason = '$e $st';
-      }
-      await Future.delayed(wait);
-      wait += const Duration(milliseconds: 1);
-    }
+							       try {
+								 final result = await action();
+								 if (accept(result)) {
+								   return result;
+								 }
+								 reason = 'not accepted';
+							       } catch (e, st) {
+								 reason = '$e $st';
+							       }
+							       await Future.delayed(wait);
+							       wait += const Duration(milliseconds: 1);
+							     }
 
-    throw Exception('$limit tries exceeded: $reason');
-  }
+							     throw Exception('$limit tries exceeded: $reason');
+							   }
 
   /// Read the json output from the main isolate.
   Future<Map<String, dynamic>> _finalizeOutput() async => _exponentialBackoff(
-      () async => jsonDecode(_outputBuffer.toString().trim()), (_) => true);
+      () async{
+      var outBuf = _outputBuffer.toString().trim();
+      var endIsolate = '<<<---END ISOLATE OUTPUT--->>>';
+      var substr = outBuf.substring(outBuf.indexOf(endIsolate)+endIsolate.length);
+      return jsonDecode(substr);
+      }, (_) => true);
 
   Future<Isolate> _fuzzIsolateComplete() async {
     final isolateRef = await _exponentialBackoff(
-        () async => (await _serviceClient.getVM())
-            .isolates
-            .singleWhere((isolate) => isolate.name == 'fuzz_target'),
-        (isolate) => isolate != null);
+	() async => (await _serviceClient.getVM())
+	.isolates
+	.singleWhere((isolate) => isolate.name == 'fuzz_target'),
+	(isolate) => isolate != null);
 
     final isolate = await _exponentialBackoff(
-        () async => _serviceClient.getIsolate(isolateRef.id),
-        (isolate) => isolate == null || isolate.pauseEvent.kind == 'PauseExit',
-        limit: Duration(seconds: _timeout + 2));
+	() async => _serviceClient.getIsolate(isolateRef.id),
+	(isolate) => isolate == null || isolate.pauseEvent.kind == 'PauseExit',
+	limit: Duration(seconds: _timeout + 2));
 
     _timeElapsed ??= DateTime.now().difference(_startTime);
     return isolate;
@@ -167,52 +172,52 @@ class VmController {
 
   Future<void> _fuzzIsolateDead() async {
     await _exponentialBackoff(
-        () async => (await _serviceClient.getVM()).isolates,
-        (isolates) =>
-            !isolates.any((isolate) => isolate.name == 'fuzz_target'));
+	() async => (await _serviceClient.getVM()).isolates,
+	(isolates) =>
+	!isolates.any((isolate) => isolate.name == 'fuzz_target'));
   }
 
   Future<List<Path>> _getPaths(Isolate isolate) async {
     final report = await _serviceClient
-        .getSourceReport(isolate.id, [SourceReportKind.kCoverage]);
+      .getSourceReport(isolate.id, [SourceReportKind.kCoverage]);
     final hits =
-        report.ranges.where((range) => range.coverage != null).expand((range) {
-      final uri = _pathCanonicalizer
-          .processScriptUri(report.scripts[range.scriptIndex].uri);
-      return range.coverage.hits.map((id) => _pathCanonicalizer.canonicalize(
-            Path(
-              uri,
-              id,
-            ),
-          ));
-    }).toList();
+      report.ranges.where((range) => range.coverage != null).expand((range) {
+	  final uri = _pathCanonicalizer
+	  .processScriptUri(report.scripts[range.scriptIndex].uri);
+	  return range.coverage.hits.map((id) => _pathCanonicalizer.canonicalize(
+		Path(
+		  uri,
+		  id,
+		  ),
+		));
+	  }).toList();
 
     if (_coverageTracker != null) {
       // Track coverage data. Note: do NOT track hits or we won't know later if
       // any of the hits are new.
       report.ranges.where((range) => range.coverage != null).expand((range) {
-        final uri = _pathCanonicalizer
-            .processScriptUri(report.scripts[range.scriptIndex].uri);
-        return range.coverage.misses
-            .map((id) => _pathCanonicalizer.canonicalize(
-                  Path(
-                    uri,
-                    id,
-                  ),
-                ));
-      }).forEach(_coverageTracker.reportPathMissed);
+	  final uri = _pathCanonicalizer
+	  .processScriptUri(report.scripts[range.scriptIndex].uri);
+	  return range.coverage.misses
+	  .map((id) => _pathCanonicalizer.canonicalize(
+		Path(
+		  uri,
+		  id,
+		  ),
+		));
+	  }).forEach(_coverageTracker.reportPathMissed);
 
       report.ranges
-          .where((range) => range.coverage != null)
-          .map((range) => _pathCanonicalizer
-              .processScriptUri(report.scripts[range.scriptIndex].uri))
-          .forEach(_coverageTracker.reportFileHasCoverage);
+	.where((range) => range.coverage != null)
+	.map((range) => _pathCanonicalizer
+	    .processScriptUri(report.scripts[range.scriptIndex].uri))
+	.forEach(_coverageTracker.reportFileHasCoverage);
 
       report.ranges
-          .where((range) => range.coverage == null)
-          .map((range) => _pathCanonicalizer
-              .processScriptUri(report.scripts[range.scriptIndex].uri))
-          .forEach(_coverageTracker.reportFileHasNoCoverage);
+	.where((range) => range.coverage == null)
+	.map((range) => _pathCanonicalizer
+	    .processScriptUri(report.scripts[range.scriptIndex].uri))
+	.forEach(_coverageTracker.reportFileHasNoCoverage);
     }
 
     return hits;
@@ -230,28 +235,28 @@ class VmController {
     final sdk = path.dirname(path.dirname(Platform.resolvedExecutable));
 
     _process = await Process.start('$sdk/bin/dart', [
-      '--pause_isolates_on_exit',
-      '--enable-asserts',
-      '--enable-vm-service=$_port',
-      '--disable-service-auth-codes',
-          './bin/controller.dart',
-      _script,
-      '$_timeout',
+	'--pause_isolates_on_exit',
+	'--enable-asserts',
+	'--enable-vm-service=$_port',
+	'--disable-service-auth-codes',
+	'./bin/controller.dart',
+	_script,
+	'$_timeout',
     ]);
 
     final vmCompleter = Completer();
     unawaited(_process.exitCode.then((code) {
-      _exitCode = code;
-      vmCompleter.complete();
-      _serviceClient?.dispose();
-      _serviceClient = null;
-    }));
+	  _exitCode = code;
+	  vmCompleter.complete();
+	  _serviceClient?.dispose();
+	  _serviceClient = null;
+	  }));
     _processExit = vmCompleter.future;
 
     _outputBuffer = StringBuffer();
     _process.stdout
-        .transform(utf8.decoder)
-        .listen((output) => _outputBuffer?.write(output));
+      .transform(utf8.decoder)
+      .listen((output) => _outputBuffer?.write(output));
 
     _stdErrBuffer = StringBuffer();
     _process.stderr.transform(utf8.decoder).listen(_stdErrBuffer.write);
@@ -260,9 +265,9 @@ class VmController {
     // TODO: Try a different port on failure.
     try {
       await _exponentialBackoff(
-          () async => _outputBuffer.toString(),
-          (output) =>
-              output.contains('listening on') && output.contains(':$_port/'));
+	  () async => _outputBuffer.toString(),
+	  (output) =>
+	  output.contains('listening on') && output.contains(':$_port/'));
     } catch (_) {
       throw 'Observatory did not start on $_port\noutput:\n$_outputBuffer';
     }
@@ -273,9 +278,9 @@ class VmController {
     final sdk = path.dirname(path.dirname(Platform.resolvedExecutable));
 
     final result = await Process.run('$sdk/bin/dart', [
-      '--snapshot=$snapshotPath',
-      '--snapshot-kind=kernel',
-      script,
+	'--snapshot=$snapshotPath',
+	'--snapshot-kind=kernel',
+	script,
     ]);
 
     if (result.exitCode != 0) {
@@ -286,8 +291,8 @@ class VmController {
 
 class _StdoutLog extends Log {
   @override
-  void severe(String message) => print(message);
+    void severe(String message) => print(message);
 
   @override
-  void warning(String message) => print(message);
+    void warning(String message) => print(message);
 }

@@ -60,6 +60,7 @@ Future main(List<String> args) async {
       return;
     }
 
+    print('<<<---END ISOLATE OUTPUT--->>>');
     print(jsonEncode({'success': succeeded, 'output': output.toString()}));
   });
 }
