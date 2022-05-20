@@ -9,6 +9,9 @@ In order to avoid the [observatory not starting error](https://github.com/Michae
 
 `dart run dust /path/to/script.dart`
 
+### Custom Character Set
+To specify valid characters for generated input Strings, use `-y` or `--char-set` flag with comma separated characters. Using this flag indicates exclusion of all characters not specified. All characters (ASCII 31 to 127) are valid by default.
+
 Documentation below is modified to comply the edits mentioned in this section.
 
 ## Usage
