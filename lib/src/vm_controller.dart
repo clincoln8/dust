@@ -234,8 +234,7 @@ class VmController {
       '--enable-asserts',
       '--enable-vm-service=$_port',
       '--disable-service-auth-codes',
-      path.join(Platform.environment['HOME'],
-          '.pub-cache/global_packages/dust/bin/controller.dart.snapshot.dart2'),
+          './bin/controller.dart',
       _script,
       '$_timeout',
     ]);
