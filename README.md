@@ -4,6 +4,13 @@ A coverage-guided fuzz tester for Dart.
 
 _inspired by libFuzzer and AFL etc._
 
+## clincoln8 Edits
+In order to avoid the [observatory not starting error](https://github.com/MichaelRFairhurst/dust/issues/1) and to handle the case that the program being fuzzed prints to stdout, I hard coded the path to `controller.dart` as './bin/controller.dart'. Therefore to run this version of Dust, you *must* be in the /dust/ dir when running 
+
+`dart run dust /path/to/script.dart`
+
+Documentation below is modified to comply the edits mentioned in this section.
+
 ## Usage
 
 Simply write a dart program with a `main` function, and use the first argument
@@ -22,17 +29,16 @@ generating strings, passing them to your program, and adapting them in search of
 new code paths to maximize the exploration of your code for bugs. You can fuzz
 for all kinds of properties in your code by throwing exceptions when you wish.
 
-To fuzz your script, simply run:
+To fuzz your script, simply run from `/dust/`:
 
 ```bash
-pub global activate dust
-pub global run dust path/to/script.dart
+dart run dust /path/to/script.dart
 ```
 
 **Note: it is *highly* recommended to snapshot your script before running for
 better performance.**
 
-There are some special options you can see with `pub global run dust --help` to
+There are some special options you can see with `dart run dust --help` to
 configure how exactly the fuzzer runs.
 
 ### The Corpus
@@ -75,7 +81,7 @@ deletion search, and custom constraints. These constraints affect which
 simplifications are considered valid.
 
 ```bash
-pub global run dust simplify path/to/script.dart input
+dart run dust simplify path/to/script.dart input
 ```
 
 There are useful constraints which default to off such as that no new paths are
