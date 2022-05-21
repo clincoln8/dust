@@ -12,6 +12,28 @@ In order to avoid the [observatory not starting error](https://github.com/Michae
 ### Custom Character Set
 To specify valid characters for generated input Strings, use `-y` or `--char-set` flag with comma separated characters. Using this flag indicates exclusion of all characters not specified. All characters (ASCII 31 to 127) are valid by default.
 
+### Edge Coverage
+By default, the original Dust computes line coverage and appends seeds that cover new lines of the program. 
+To examine unique paths through the program execution in addition to just line coverage, I added a new flag, `-y` or `--edge-cov`, which is now by default true. To see the effect of this flag, consider the example below:
+
+```
+void main(List<String> args) {
+  
+  final input = args[0];
+  
+  if (input.length == 7) {
+    throw ("len 7 error");
+  } else if (input.length == 4) {
+    throw ("len 4 error");
+  } else if (input.length == 3) {
+    throw ("len 3 error");
+  }
+}
+```
+
+With the original Dust defaults, only one of the following inputs would be added to the corpus if the inputs '123', '1234', and '1234567' were all executed in this order. With the modified defaults to account for execution paths instead of simply lines, all three inputs are added to the corpus since they all produce failures from unique paths.
+
+
 Documentation below is modified to comply the edits mentioned in this section.
 
 ## Usage

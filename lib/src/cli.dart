@@ -91,6 +91,11 @@ class Cli {
       help: 'Specify valid characters for input String generation. '
           'All characters are valid by default.',
     )
+    ..addFlag('edgeCov',
+        abbr: 'z',
+        help:
+            'Whether to compute edge coverage in addition to branch coverage.',
+        defaultsTo: true)
     ..addOption('count',
         abbr: 'n',
         help: 'How many fuzz cases to run. -1 is no limit',
@@ -210,7 +215,7 @@ class Cli {
       isolateMutators = await _getIsolateMutators(args);
       final mutators = _getMutators(args, isolateMutators, seedLibrary);
       final driver = Driver(seedLibrary, failureLibrary, batchSize,
-          vmControllers, mutators, Random(),
+          vmControllers, mutators, Random(), args['edgeCov'],
           simplify: args['simplify']);
       statsCollector.collectFrom(driver);
 

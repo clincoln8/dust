@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:math';
 
+import 'package:dust/src/execution_path.dart';
 import 'package:dust/src/failure_library.dart';
 import 'package:dust/src/input_result.dart';
 import 'package:dust/src/mutator.dart';
@@ -17,6 +18,7 @@ import 'package:dust/src/seed_library.dart';
 import 'package:dust/src/simplify/simplifier.dart';
 import 'package:dust/src/simplify/superset_paths_constraint.dart';
 import 'package:dust/src/vm_controller.dart';
+import 'package:dust/src/vm_result.dart';
 import 'package:dust/src/weighted_random_choice.dart';
 import 'package:meta/meta.dart';
 
@@ -40,9 +42,11 @@ class Driver {
   final _uniqueFailStreamCtrl = StreamController<InputResult>.broadcast();
   final _duplicateFailStreamCtrl = StreamController<InputResult>.broadcast();
 
+  final bool _computeEdgeCoverage;
+
   /// Construct a Driver to run fuzz testing.
   Driver(this._seeds, this._failures, this._batchSize, this._runners,
-      this._mutators, this._random,
+      this._mutators, this._random, this._computeEdgeCoverage,
       {@required bool simplify})
       : _simplify = simplify;
 
@@ -117,28 +121,39 @@ class Driver {
   }
 
   Future<void> _preseed(VmController runner, SeedCandidate seed) async {
-    final result = await runner.run(seed.input);
-    final newSeed = seed.inCorpus
-        ? _seeds.report(seed.input, result)
-        : await _potentialSeed(InputResult(seed.input, result), runner);
-    var broadcastSeed = seed;
-    if (newSeed != null) {
-      if (newSeed.input != seed.input) {
-        broadcastSeed = SeedCandidate.forText(newSeed.input);
-      }
-      broadcastSeed.accepted = true;
-    } else {
-      broadcastSeed.accepted = false;
+    final results = <VmResult>[];
+    final res = await runner.run(seed.input);
+    results.add(res);
+    if (_computeEdgeCoverage) {
+      results.add(VmResult(res.timeElapsed, [ExecutionPath(res.paths)]));
     }
 
-    _seedCandidateProcessedStreamCtrl.add(broadcastSeed);
+    for (final result in results) {
+      final newSeed = seed.inCorpus
+          ? _seeds.report(seed.input, result)
+          : await _potentialSeed(InputResult(seed.input, result), runner);
+      var broadcastSeed = seed;
+      if (newSeed != null) {
+        if (newSeed.input != seed.input) {
+          broadcastSeed = SeedCandidate.forText(newSeed.input);
+        }
+        broadcastSeed.accepted = true;
+      } else {
+        broadcastSeed.accepted = false;
+      }
+
+      _seedCandidateProcessedStreamCtrl.add(broadcastSeed);
+    }
   }
 
   Future<void> _runCase(VmController runner, Seed seed) async {
     final input = await mutate(seed.input, _random, _mutators);
-    final result = await runner.run(input);
-    final inputResult = InputResult(input, result);
-    if (!result.succeeded) {
+
+    final res = await runner.run(input);
+
+    final inputResult = InputResult(input, res);
+
+    if (!res.succeeded) {
       final previousFailure = _failures.report(inputResult);
       if (previousFailure == null) {
         _uniqueFailStreamCtrl.add(inputResult);
@@ -149,10 +164,18 @@ class Driver {
       _successStreamCtrl.add(null);
     }
 
-    final newSeed = await _potentialSeed(inputResult, runner);
-    // Edge case: new seed may no longer be new.
-    if (newSeed != null) {
-      _newSeedStreamCtrl.add(newSeed);
+    final results = [inputResult];
+    if (_computeEdgeCoverage) {
+      results.add(InputResult(
+          input, VmResult(res.timeElapsed, [ExecutionPath(res.paths)])));
+    }
+
+    for (final inResult in results) {
+      final newSeed = await _potentialSeed(inResult, runner);
+      // Edge case: new seed may no longer be new.
+      if (newSeed != null) {
+        _newSeedStreamCtrl.add(newSeed);
+      }
     }
   }
 }
